@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Sanipak Gebze Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; }
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 200px; /* 3. kolon biraz daha sabit */
+            grid-template-rows: auto auto;
+            gap: 10px;
+            padding: 10px;
+            align-items: center;
+        }
+        .search-area {
+            grid-column: 1 / 3;
+            grid-row: 1;
+        }
+        .filter-area {
+            grid-column: 1 / 3;
+            grid-row: 2;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+        .checkbox-area { 
+            grid-column: 3; 
+            grid-row: 1 / 3; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-start; 
+            padding-left: 20px;
+            border-left: 1px solid #ddd;
+            font-size: 13px;
+        }
+        /* Panel Tasarımı */
+        .upload-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: center;
+            background: #fff;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            background: #2ecc71;
+            color: white;
+            font-size: 14px;
+            margin: 5px;
+            text-transform: uppercase;
+            transition: 0.2s; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            letter-spacing: 0.5px;
+		}
+        button:hover {
+            background: #27ae60;
+            transform: scale(1.1);
+            font-size: 14px;
+		}
+        /* Arama ve Filtre */
+        .controls {
+            text-align: center;
+            background: #fff;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            padding: 5px;
+            margin: 40px 10px 10px;
+		}
+
+        #searchInput {padding: 10px; width: 300px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .filter-btn { background: #2ecc71; }
+        .filter-btn.active { background: #1e8449; font-weight: bold;font-size: 18px; border-bottom:3px solid #3e3;}
+        
+        /* Tablo */
+        table { 
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            table-layout: fixed; /* Tablonun esnemesini tamamen keser */}
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 5px; 
+            text-align: left;
+            white-space: nowrap;    /* Metnin alt satıra geçmesini engeller */
+            overflow: hidden;       /* Hücre dışına taşmayı engeller */
+            text-overflow: ellipsis;/* Sığmayan yere ... koyar */
+        }
+        th { background-color: #2eac71; color: white; }
+        .clickable { cursor: pointer; }
+        .clickable:hover { background-color: #efe; }
+        .details-row { display: none; background: #f0f0f0; }
+        /* İptal edilen satırları soluk yapar */
+        .satir-iptal {
+            opacity: 0.5; /* Saydamlık */
+            background-color: #f9f9f9 !important; /* Çok hafif gri arka plan */
+        }
+            /* Boş veya eşleşmeyen durumlar için */
+        .durum-badge.bos { background-color: #eee; color: #999; border: 1px solid #ccc; }
+            /* Durum Badge Stilleri */
+        .durum-badge {
+            border-radius: 5px;
+            padding:2px;
+            font-size: 14px;
+            color: #fff;
+            display: inline-block;
+            margin-top: 5px;
+            text-transform: uppercase;
+            line-height: 20px;      /* Yazıyı dikey ortalar */
+            white-space: nowrap;    /* Yazının alt satıra geçmesini engeller */
+            overflow: hidden;       /* Taşan kısmı gizler */
+            text-overflow: ellipsis;/* Taşan kısma ... ekler */
+            width: 140px;
+            box-sizing: border-box;
+        }
+                
+        .ONAYLANDI { background-color: #09a048; }
+        .REDDEDILDI { background-color: #c0392b; }
+        .ONAY-BEKLIYOR { background-color: #f80; }
+        .IPTAL-EDILDI {
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #aaa !important; /* Soluk görünmesi için */
+            padding: 0 !important;
+        }
+        .SARTLI-ONAYLANDI { background-color: #2980b9; }
+        .ONAYA-SUNULACAK { background-color: #8e44ad; }
+                
+        .details-content { 
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: #fdfdfd;
+            width: 80%;
+            margin-left: auto; margin-right: 0; 
+            border: 1px solid #eee; border-radius: 8px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        }
+        .data-card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 6px;
+            flex: 1;
+            background: white; }
+        .data-card h4 { margin: 0 0 10px 0; font-size: 16px; color: #2ecc71; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            margin: 3px 0;
+        }
+        
+        /* Tablo Satır Sabitleme */
+        /* Satır yüksekliğini sabitlemek için padding'i düşürüyoruz */
+        #coTable tr {
+            height: 30px !important; /* İstenen yüksekliğe çekin (örneğin 30px) */
+        }
+
+        #coTable td {
+            height: 30px !important; 
+            padding: 0px 5px !important; /* Dikey padding'i 0 yaptık */
+            vertical-align: middle; 
+            line-height: 30px;      /* Yükseklikle aynı yapın ki dikey tam ortalasın */
+            box-sizing: border-box;
+        }
+        /* Sütun Genişlikleri (Toplam %100 olacak şekilde) */
+        #coTable th:nth-child(1), #coTable td:nth-child(1) { width: 40px; }  /* Sıra */
+        #coTable th:nth-child(2), #coTable td:nth-child(2) { width: 70px; }  /* CO NO */
+        #coTable th:nth-child(3), #coTable td:nth-child(3) { width: auto; }  /* Açıklama (Geniş kalan) */
+        #coTable th:nth-child(4), #coTable td:nth-child(4) { width: 90px; } /* Disiplin */
+        #coTable th:nth-child(5), #coTable td:nth-child(5) { width: 100px; } /* Tarih */
+        #coTable th:nth-child(6), #coTable td:nth-child(6) { width: 140px; } /* Durum */
+        #coTable th:nth-child(7), #coTable td:nth-child(7) { width: 120px; } /* Tutar */
+
+        /* Sütun Hizalamaları */
+        th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2), th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) { text-align: center; }
+        th:nth-child(7), td:nth-child(7) { text-align: right; }
+        .soluk { color: #bbb !important;  }
+
+        .hidden-col {
+            display: none !important;
+        }
+
+        #grafikModal {
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0, 0, 0, 0.8); 
+            z-index: 9999; /* Çok yüksek bir değer veriyoruz ki her şeyin üstünde olsun */
+            justify-content: center; 
+            align-items: center;
+        }
+    </style>
+
+    <script src="[https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels](https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels)"></script>
+</head>
+
+<body>
+
+    <h2 style="text-align:center;">Sanipak Gebze Projesi İş Değişiklik Emirleri</h2>
+
+    <div class="upload-container">
+        <div id="fileInfo" style="font-size: 11px; margin-bottom: 5px;">Excel'den veri aktarın:</div>
+        <button onclick="document.getElementById('excelFile').click()">Dosya Seç</button>
+        <input type="file" id="excelFile" accept=".xlsx" style="display:none">
+    </div>
+
+    <!-- Grafik Düğmesi -->
+    <button onclick="toggleModal()" style="margin: 10px; padding: 10px;">Analiz Grafikleri</button>
+
+    <!-- Modal Paneli -->
+    <div id="grafikModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:white; padding:20px; border-radius:10px; width:90%; height:90%; position:relative; display: flex; flex-direction: column;">
+            
+            <!-- Üst Bar: Checkboxlar ve Kapat düğmesi -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                    <input type="checkbox" id="showIptal" onchange="updateCharts()"> İptal Edilenleri Göster
+                    <input type="checkbox" id="showRed" onchange="updateCharts()" style="margin-left: 10px;"> Reddedilenleri Göster
+                </div>
+                <button onclick="toggleModal()" style="background: #e74c3c;">KAPAT</button>
+            </div>
+
+            <!-- Grafik Alanı -->
+            <div style="display: flex; gap: 20px; height: 60%; width: 100%;"> 
+                <div style="flex: 1; min-width: 0;"><canvas id="disiplinChart"></canvas></div>
+                <div style="flex: 1; min-width: 0;"><canvas id="durumChart"></canvas></div>
+            </div>
+
+            <!-- Özet Alanı -->
+            <div style="display: flex; gap: 20px; margin-top: auto; padding-top: 10px;">
+                <div id="disiplinSummary" style="flex: 1; font-size: 16px; border: 1px solid #ddd;border-radius:10px; padding: 10px; background: #f9f9f9;"></div>
+                <div id="durumSummary" style=" flex: 1; font-size: 16px; border: 1px solid #ddd;border-radius:10px; padding: 10px; background: #f9f9f9;"></div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="controls">
+        <div class="grid-container">
+            <!-- 1) Arama: Kolon 1-2, Satır 1 -->
+            <div class="search-area">
+                <input type="text" id="searchInput" onkeyup="renderTable()" placeholder="Açıklama ara...">
+            </div>
+
+            <!-- 2) Filtreler: Kolon 1-2, Satır 2 -->
+            <div id="filterButtons" class="filter-area">
+                <button class="filter-btn active" onclick="setActiveFilter('Tümü', this)">Tümü</button>
+                <button class="filter-btn" onclick="setActiveFilter('MİMARİ', this)">Mimari</button>
+                <button class="filter-btn" onclick="setActiveFilter('MEKANİK', this)">Mekanik</button>
+                <button class="filter-btn" onclick="setActiveFilter('ELEKTRİK', this)">Elektrik</button>
+            </div>
+
+            <!-- 3) Checkbox'lar: Kolon 3, Satır 1-2 -->
+            <div class="checkbox-area">
+                <label><input type="checkbox" class="col-checkbox" data-index="3" checked onchange="toggleColumn(3, this)"> Disiplin</label>
+                <label><input type="checkbox" class="col-checkbox" data-index="4" checked onchange="toggleColumn(4, this)"> Tarih</label>
+                <label><input type="checkbox" class="col-checkbox" data-index="5" checked onchange="toggleColumn(5, this)"> Durum</label>
+                <label><input type="checkbox" class="col-checkbox" data-index="6" checked onchange="toggleColumn(6, this)"> Tutar</label>
+            </div>
+        </div>
+    </div>
+
+
+    <table id="coTable">
+        <thead>
+            <tr>
+                <th>Sıra</th>
+                <th>CO NO</th>
+                <th>Açıklama</th>
+                <th>Disiplin</th>
+                <th>Tarih</th>
+                <th>Durum</th>
+                <th>Tutar (TL)</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+<script src="data.js" charset="UTF-8"></script>
+
+<script>
+    let currentFilter = 'Tümü';
+
+    //fuction 1: Üstteki "TÜMÜ", "MİMARİ", "MEKANİK", "ELEKTRİK" düğmelerine tıklandığında tablodaki veriyi filtreliyor.
+    function setActiveFilter(filter, btn) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderTable();
+    }
+
+    //function 2: Tabloyu oluşturan ve detay satırlarını (detRow) içeriğine çizen ana fonksiyon.
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        
+        // Veri kontrolü
+        if (typeof myData === 'undefined') {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:red;">Veri dosyası (data.js) yüklenemedi!</td></tr>';
+            return;
+        }
+        
+        // Filtreleme mantığı
+        let filtered = myData.filter(item =>
+            (currentFilter === 'Tümü' || item.disiplin === currentFilter) &&
+            item.aciklama.toUpperCase().includes(document.getElementById('searchInput').value.toUpperCase())
+        );
+        
+        filtered.forEach((item, index) => {
+            // Durum sınıfını güvenli hale getirme (boşlukları tire yap, büyük harf yap)
+            const durumSinif = item.durum ? item.durum.trim().toUpperCase().replace(/\s+/g, '-') : 'bos';
+            
+            // Ana Satır
+            let row = tbody.insertRow();
+            row.className = "clickable";
+            
+            // Detay Açma Fonksiyonu
+            row.onclick = function() {
+                let next = this.nextElementSibling;
+                next.style.display = next.style.display === "table-row" ? "none" : "table-row";
+            };
+            
+            if (item.durum === "IPTAL-EDILDI") row.classList.add('soluk');
+            
+            row.innerHTML = `<td>${index + 1}</td>
+                             <td>${item.no}</td>
+                             <td>${item.aciklama}</td>
+                             <td>${item.disiplin}</td>
+                             <td>${item.tarih}</td>
+                             <td><span class="durum-badge ${durumSinif}">${item.durum || ''}</span></td>
+                             <td style="text-align:right;">${item.toplamTL}</td>`;
+    
+            // Detay Satırı
+            let detRow = tbody.insertRow();
+            detRow.style.display = "none";
+            detRow.className = "details-row" + (item.durum === "IPTAL-EDILDI" ? " soluk" : "");
+            
+            detRow.innerHTML = `<td colspan="7">
+                <div class="details-content">
+                    <!-- DURUM -->
+                    <div class="data-card" >
+                        <h4>DURUM</h4>
+                        <div class="data-row" style="font-weight:bold;">${item.durum}</div>
+                    </div>
+
+                    <!-- MALZEME (EUR) -->
+                    <div class="data-card">
+                        <h4>MALZEME TUTARI</h4>
+                        <div class="data-row">Tutar: <b>${item.malzemeEUR} EUR</b></div>
+                        <div class="data-row">Kur: ${item.kur}</div>
+                        <div class="data-row">TL Tutar: ${item.malzemeTL}</div>
+                    </div>
+
+                    <!-- İŞÇİLİK TUTARI(TL) -->
+                    <div class="data-card">
+                        <h4>İŞÇİLİK TUTARI</h4>
+                        <div class="data-row">Tutar: <b>${item.iscilikTL} TL</b></div>
+                    </div>
+
+                    <!-- TOPLAM TUTAR (TL) -->
+                    <div class="data-card">
+                        <h4>TOPLAM TUTAR (TL)</h4>
+                        <div class="data-row">TL Tutar: <b>${item.toplamTL}</b></div>
+                    </div>
+                </div>
+            </td>`;
+            // ÖNEMLİ: Tablo çizildikten hemen sonra mevcut durumu uygula
+            applyColumnVisibility();
+        });
+
+        document.querySelectorAll('.col-checkbox').forEach(cb => {
+            toggleColumn(parseInt(cb.getAttribute('data-index')), cb);
+        });
+
+    }
+
+    // function 2.1: 
+    function applyColumnVisibility() {
+        // Tüm checkbox'ları bul
+        document.querySelectorAll('.col-checkbox').forEach(cb => {
+            const index = parseInt(cb.getAttribute('data-index'));
+            const isChecked = cb.checked;
+            
+            // Tablodaki her satırın ilgili hücresini bul ve durumu uygula
+            document.querySelectorAll('#coTable tr').forEach(row => {
+                const cells = row.querySelectorAll('th, td');
+                if (cells[index]) {
+                    cells[index].classList.toggle('hidden-col', !isChecked);
+                }
+            });
+        });
+    }
+
+    // function 3: Sütun gizleme/gösterme işlemini yönetiyor.
+    function toggleColumn(index, checkbox) {
+        // 1. İlgili indeksteki tüm hücreleri bul
+        document.querySelectorAll('#coTable tr').forEach(row => {
+            let cells = row.querySelectorAll('th, td');
+            if (cells[index]) {
+                cells[index].classList.toggle('hidden-col', !checkbox.checked);
+            }
+        });
+    }
+
+    //function 4: 
+    function updateCharts() {
+        const showIptal = document.getElementById('showIptal')?.checked;
+        const showRed = document.getElementById('showRed')?.checked;
+
+        const filteredData = myData.filter(item => {
+            if (!showIptal && item.durum === 'IPTAL-EDILDI') return false;
+            if (!showRed && item.durum === 'REDDEDILDI') return false;
+            return true;
+        });
+
+        const disiplinData = filteredData.reduce((acc, curr) => {
+            let cleanVal = curr.toplamTL.toString().replace(/\./g, '').replace(',', '.');
+            let val = parseFloat(cleanVal) || 0;
+            acc[curr.disiplin] = (acc[curr.disiplin] || 0) + val;
+            return acc;
+        }, {});
+
+        const durumData = filteredData.reduce((acc, curr) => {
+            acc[curr.durum] = (acc[curr.durum] || 0) + 1;
+            return acc;
+        }, {});
+
+        if (window.disiplinChart instanceof Chart) window.disiplinChart.destroy();
+        if (window.durumChart instanceof Chart) window.durumChart.destroy();
+
+        const ctx1 = document.getElementById('disiplinChart');
+        const ctx2 = document.getElementById('durumChart');
+
+        if (ctx1 && ctx2) {
+            // Disiplin Grafiği
+            window.disiplinChart = new Chart(ctx1.getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(disiplinData),
+                    datasets: [{
+                        data: Object.values(disiplinData),
+                        backgroundColor: ['#2ecc71', '#3498db', '#f1c40f', '#e74c3c']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        title: { display: true, text: 'Disiplin Bazlı Tutar (TL)' }
+                    }
+                }
+            });
+
+            // Durum Grafiği
+            window.durumChart = new Chart(ctx2.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(durumData),
+                    datasets: [{
+                        data: Object.values(durumData),
+                        backgroundColor: ['#5c5', '#e67e22', '#e74c3c', '#3498db', '#f39c12']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        title: { display: true, text: 'İş Emirleri Durum Dağılımı (Adet)' }
+                    }
+                }
+            });
+        }
+
+        const disiplinHTML = Object.entries(disiplinData).map(([key, val]) => 
+            `<div><b>${key}:</b> ${val.toLocaleString('tr-TR', {minimumFractionDigits: 2})} TL</div>`
+        ).join('');
+
+        const durumHTML = Object.entries(durumData).map(([key, val]) => {
+            let toplamTutar = filteredData.filter(i => i.durum === key)
+                .reduce((sum, curr) => sum + (parseFloat(curr.toplamTL.toString().replace(/\./g, '').replace(',', '.')) || 0), 0);
+            return `<div><b>${key}:</b> ${val} Adet / ${toplamTutar.toLocaleString('tr-TR', {minimumFractionDigits: 2})} TL</div>`;
+        }).join('');
+
+        document.getElementById('disiplinSummary').innerHTML = '<strong>Disiplin Toplamları:</strong><br>' + disiplinHTML;
+        document.getElementById('durumSummary').innerHTML = '<strong>Durum Toplamları:</strong><br>' + durumHTML;
+    }
+
+
+    // function 6: Modal penceresini açar/kapatır ve her açılışta güncel grafikleri çizer.
+    function toggleModal() {
+        const modal = document.getElementById('grafikModal');
+        
+        if (modal.style.display === 'flex') {
+            // Kapatılıyorsa direkt kapat
+            modal.style.display = 'none';
+        } else {
+            // Açılıyorsa önce görünür yap, SONRA çiz
+            modal.style.display = 'flex';
+            
+            // 50 milisaniye bekletiyoruz ki tarayıcı modalı "ekrana çizmiş" olsun
+            setTimeout(() => {
+                updateCharts();
+            }, 50); 
+        }
+    }
+
+    // Sayfa yüklendiğinde grafikleri başlat
+    window.onload = () => {
+        renderTable();
+        updateCharts();
+    };
+
+</script>
+
+</body>
+</html>
